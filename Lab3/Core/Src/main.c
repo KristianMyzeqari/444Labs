@@ -56,7 +56,7 @@ int32_t tracker;
 float array[20];
 int globalIndex;
 
-#define AUDIO_REC 4096
+#define AUDIO_REC 64000
 #define WAIT_TIME 100
 
 int32_t recBuf[AUDIO_REC];
@@ -64,6 +64,7 @@ int32_t playBuf[AUDIO_REC];
 
 uint8_t dmaRecBuffCplt = 0;
 uint8_t isRecording = 0;
+uint8_t hasPlayed = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,10 +84,15 @@ static void MX_DFSDM1_Init(void);
 /****
  * Interrupt function
  */
-//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-//	HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, recBuf, AUDIO_REC);
-//	isRecording = 1;
-//}
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	if(hasPlayed == 1){
+		HAL_DFSDM_FilterRegularStop_DMA(&hdfsdm1_filter0);
+		HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+	}
+	HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, recBuf, AUDIO_REC);
+	isRecording = 1;
+	hasPlayed = 1;
+}
 
 //void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 //	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.7 * array[globalIndex]);
@@ -135,27 +141,25 @@ int main(void)
   MX_TIM2_Init();
   MX_DFSDM1_Init();
   /* USER CODE BEGIN 2 */
-
-
-
-
-
-
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
   //Populate array, we are using an array of 10 slots, where each slot is incremented by 0.6283 radians
-  float curVal = 0.0;
-  float trigVal;
-  for(int i = 0; i < 20; i++){
-	  trigVal = 2047.5 * sin(curVal);
-	  array[i] = trigVal;
-	  curVal += 0.314159;
-  }
-  HAL_TIM_Base_Start_IT(&htim2);
-  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, array, 20, DAC_ALIGN_12B_R);
+
+  //PART 2 CODE
+//  float curVal = 0.0;
+//  float trigVal;
+//  for(int i = 0; i < 20; i++){
+//	  trigVal = 2047.5 * sin(curVal);
+//	  array[i] = trigVal;
+//	  curVal += 0.314159;
+//  }
+
+//  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, array, 20, DAC_ALIGN_12B_R);
+
   while (1)
   {
 
@@ -169,12 +173,13 @@ int main(void)
 
 	  if(dmaRecBuffCplt == 1){
 		  for(i = 0; i < AUDIO_REC; i++){
-			  playBuf[i] = recBuf[i] >> 8;
+			  playBuf[i] = 0.7 * (recBuf[i] >> 8);
 			  tracker = playBuf[i];
 		  }
 		  dmaRecBuffCplt = 0;
 		  isRecording = 0;
 		  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, &playBuf, AUDIO_REC, DAC_ALIGN_12B_R);
+		  dmaRecBuffCplt = 0;
 	  }
   }
   /* USER CODE END 3 */
@@ -294,7 +299,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter0.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter0.Init.RegularParam.DmaMode = ENABLE;
   hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter0.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter0.Init.FilterParam.Oversampling = 100;
   hdfsdm1_filter0.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter0) != HAL_OK)
   {
@@ -303,7 +308,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel2.Instance = DFSDM1_Channel2;
   hdfsdm1_channel2.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel2.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel2.Init.OutputClock.Divider = 30;
+  hdfsdm1_channel2.Init.OutputClock.Divider = 48;
   hdfsdm1_channel2.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel2.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel2.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
@@ -348,7 +353,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 15000;
+  htim2.Init.Period = 4800;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
