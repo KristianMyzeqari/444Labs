@@ -51,8 +51,6 @@ TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 
-int32_t tracker;
-
 float array[20];
 int globalIndex;
 
@@ -60,11 +58,14 @@ int globalIndex;
 #define WAIT_TIME 100
 
 int32_t recBuf[AUDIO_REC];
-int32_t playBuf[AUDIO_REC];
+uint32_t playBuf[AUDIO_REC];
 
 uint8_t dmaRecBuffCplt = 0;
 uint8_t isRecording = 0;
 uint8_t hasPlayed = 0;
+
+int32_t maxVal = -2147483648;
+int32_t minVal = 2147483647;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,7 +116,6 @@ void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filt
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	uint16_t i = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -159,7 +159,7 @@ int main(void)
 //  }
 
 //  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, array, 20, DAC_ALIGN_12B_R);
-
+  float temp;
   while (1)
   {
 
@@ -172,13 +172,29 @@ int main(void)
 	  }
 
 	  if(dmaRecBuffCplt == 1){
-		  for(i = 0; i < AUDIO_REC; i++){
-			  playBuf[i] = recBuf[i];
-			  playBuf[i] = (playBuf[i] >> 8);
-			  playBuf[i] &= 0x00003FFF;
-			  //playBuf[i] = 0.7*playBuf[i];
-			  tracker = playBuf[i];
+		  for(int i = 0; i < AUDIO_REC; i++){
+
+			  recBuf[i] = recBuf[i] >> 8;
+
+			  if(recBuf[i] < minVal){
+				  minVal = recBuf[i];
+			  }
+			  if(recBuf[i] > maxVal){
+				  maxVal = recBuf[i];
+			  }
 		  }
+
+		  if(minVal < 0) minVal = -1 * minVal;
+
+		  temp = (float)((float)4095/((float)maxVal+(float)minVal));
+
+		  for(int j = 0; j < AUDIO_REC; j++){
+			  recBuf[j] = recBuf[j] + minVal;
+			  playBuf[j] = temp * recBuf[j];
+
+
+		  }
+
 		  dmaRecBuffCplt = 0;
 		  isRecording = 0;
 		  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, &playBuf, AUDIO_REC, DAC_ALIGN_12B_R);
