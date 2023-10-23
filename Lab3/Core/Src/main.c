@@ -173,7 +173,10 @@ int main(void)
 
 	  if(dmaRecBuffCplt == 1){
 		  for(i = 0; i < AUDIO_REC; i++){
-			  playBuf[i] = 0.7 * (recBuf[i] >> 8);
+			  playBuf[i] = recBuf[i];
+			  playBuf[i] = (playBuf[i] >> 8);
+			  playBuf[i] &= 0x00003FFF;
+			  //playBuf[i] = 0.7*playBuf[i];
 			  tracker = playBuf[i];
 		  }
 		  dmaRecBuffCplt = 0;
