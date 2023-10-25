@@ -76,7 +76,7 @@ int32_t minVal = 2147483647;
 //___________________________ PART 4 _____________________________
 uint8_t counter = 0;
 uint8_t playSong = 0;
-
+uint8_t hasRecording = 0;
 
 /* USER CODE END PV */
 
@@ -109,7 +109,7 @@ static void MX_DFSDM1_Init(void);
 
 // PART 1 TIMER INTERRUPT PLAYS THE NEXT SOUND
 //void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
-//	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.7 * array[globalIndex]);
+//	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.7 * sound1[globalIndex]);
 //
 //	globalIndex++;
 //	if (globalIndex == 20) globalIndex = 0;
@@ -128,6 +128,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		if(counter > 1) HAL_DFSDM_FilterRegularStop_DMA(&hdfsdm1_filter0);
 		HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, recBuf, AUDIO_REC);
 		isRecording = 1;
+		hasRecording = 1;
 	}
 
 	else {
@@ -146,7 +147,7 @@ void make_Sounds(){
 	float trigVal;
 	for(int i = 0; i < 20; i++){
 		trigVal = 2047.5 * sin(curVal) + 2047.5;
-	  	sound1[i] = trigVal;
+	  	sound1[i] = 0.8*trigVal;
 	  	curVal += 0.314159;
 	}
 
@@ -154,7 +155,7 @@ void make_Sounds(){
 	trigVal = 0.0;
 	for(int i = 0; i < 18; i++){
 		trigVal = 2047.5 * sin(curVal) + 2047.5;
-		sound2[i] = trigVal;
+		sound2[i] = 0.8*trigVal;
 		curVal += 0.349065;
 	}
 
@@ -162,7 +163,7 @@ void make_Sounds(){
 	trigVal = 0.0;
 	for(int i = 0; i < 16; i++){
 		trigVal = 2047.5 * sin(curVal) + 2047.5;
-		sound3[i] = trigVal;
+		sound3[i] = 0.8*trigVal;
 		curVal += 0.392698;
 	}
 
@@ -170,7 +171,7 @@ void make_Sounds(){
 	trigVal = 0.0;
 	for(int i = 0; i < 14; i++){
 		trigVal = 2047.5 * sin(curVal) + 2047.5;
-		sound4[i] = trigVal;
+		sound4[i] = 0.8*trigVal;
 		curVal += 0.448798;
 	}
 
@@ -178,7 +179,7 @@ void make_Sounds(){
 	trigVal = 0.0;
 	for(int i = 0; i < 12; i++){
 		trigVal = 2047.5 * sin(curVal) + 2047.5;
-		sound5[i] = trigVal;
+		sound5[i] = 0.8*trigVal;
 		curVal += 0.523598;
 	}
 
@@ -252,6 +253,7 @@ int main(void)
   MX_DFSDM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
+  //HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, &sound1, 20, DAC_ALIGN_12B_R);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -288,8 +290,16 @@ int main(void)
 		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		  HAL_Delay(WAIT_TIME);
 	  }
+	  else if(hasRecording == 1){
+		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		  HAL_Delay(WAIT_TIME*7);
+	  }
+	  else{
+		  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+	  }
 
 	  if((counter % 2 == 0) && (playSong == 1)) {
+		  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 	  		play_Sounds();
 	  		HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, playBuf, AUDIO_REC, DAC_ALIGN_12B_R);
 	  		HAL_Delay(2560);
@@ -298,6 +308,7 @@ int main(void)
 	  			recBuf[i] = 0;
 	  		}
 	  		playSong = 0;
+	  		hasRecording = 0;
 	  }
 
 	  if(dmaRecBuffCplt == 1){
