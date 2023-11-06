@@ -28,6 +28,8 @@
 #include "stm32l4s5i_iot01_magneto.h"
 #include "stm32l4s5i_iot01_psensor.h"
 #include "stm32l4s5i_iot01_accelero.h"
+
+#include "stm32l4s5i_iot01_qspi.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,6 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MEMORY_WRITE_ADDR	0x08000020UL
 
 /* USER CODE END PD */
 
@@ -48,12 +51,16 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
 
+OSPI_HandleTypeDef hospi1;
+
 UART_HandleTypeDef huart1;
 
 osThreadId Read_TaskHandle;
 osThreadId UART_TransmitHandle;
 osThreadId Button_TaskHandle;
 /* USER CODE BEGIN PV */
+
+/**************************** PART 1 AND PART 2 VARIABLES ******************/
 uint8_t txbuffer[64];
 
 int sensorNum = 0;
@@ -62,6 +69,10 @@ float temp;
 int16_t magnet[3];
 float pressure;
 int16_t accel[3];
+
+/**************************** PART 3 VARIABLES ****************************/
+uint8_t *writeBuf = "Number 69";
+uint8_t readBuf[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,6 +80,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_OCTOSPI1_Init(void);
 void StartRead_Task(void const * argument);
 void StartUART_Transmit(void const * argument);
 void StartButton_Task(void const * argument);
@@ -95,7 +107,7 @@ void StartButton_Task(void const * argument);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_SET);
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -118,6 +130,7 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C2_Init();
   MX_USART1_UART_Init();
+  MX_OCTOSPI1_Init();
   /* USER CODE BEGIN 2 */
 
   /* Initialize BSP Peripherals */
@@ -131,6 +144,11 @@ int main(void)
 	  Error_Handler();
   }
   if(BSP_ACCELERO_Init() != ACCELERO_OK){
+	  Error_Handler();
+  }
+
+  /* Initialize QSPI */
+  if(BSP_QSPI_Init() != QSPI_OK){
 	  Error_Handler();
   }
 
@@ -170,12 +188,26 @@ int main(void)
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
-  osKernelStart();
+  //osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
+  //HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_RESET);
+
+  if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+	  Error_Handler();
+  }
+
+  if (BSP_QSPI_Write(writeBuf, 0, strlen(writeBuf))){
+	  Error_Handler();
+  }
+
+  if (BSP_QSPI_Read(readBuf, 0, 100)){
+	  Error_Handler();
+  }
+  HAL_UART_Transmit(&huart1, readBuf, strlen((char*)readBuf), HAL_MAX_DELAY);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -309,6 +341,54 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief OCTOSPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_OCTOSPI1_Init(void)
+{
+
+  /* USER CODE BEGIN OCTOSPI1_Init 0 */
+
+  /* USER CODE END OCTOSPI1_Init 0 */
+
+  OSPIM_CfgTypeDef OSPIM_Cfg_Struct = {0};
+
+  /* USER CODE BEGIN OCTOSPI1_Init 1 */
+
+  /* USER CODE END OCTOSPI1_Init 1 */
+  /* OCTOSPI1 parameter configuration*/
+  hospi1.Instance = OCTOSPI1;
+  hospi1.Init.FifoThreshold = 1;
+  hospi1.Init.DualQuad = HAL_OSPI_DUALQUAD_DISABLE;
+  hospi1.Init.MemoryType = HAL_OSPI_MEMTYPE_MICRON;
+  hospi1.Init.DeviceSize = 32;
+  hospi1.Init.ChipSelectHighTime = 1;
+  hospi1.Init.FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE;
+  hospi1.Init.ClockMode = HAL_OSPI_CLOCK_MODE_0;
+  hospi1.Init.ClockPrescaler = 1;
+  hospi1.Init.SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE;
+  hospi1.Init.DelayHoldQuarterCycle = HAL_OSPI_DHQC_DISABLE;
+  hospi1.Init.ChipSelectBoundary = 0;
+  hospi1.Init.DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_BYPASSED;
+  if (HAL_OSPI_Init(&hospi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  OSPIM_Cfg_Struct.ClkPort = 1;
+  OSPIM_Cfg_Struct.NCSPort = 1;
+  OSPIM_Cfg_Struct.IOLowPort = HAL_OSPIM_IOPORT_1_LOW;
+  if (HAL_OSPIM_Config(&hospi1, &OSPIM_Cfg_Struct, HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN OCTOSPI1_Init 2 */
+
+  /* USER CODE END OCTOSPI1_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -368,10 +448,21 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : REDLED_Pin */
+  GPIO_InitStruct.Pin = REDLED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(REDLED_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BUTT_Pin MagnetSens_Pin */
   GPIO_InitStruct.Pin = BUTT_Pin|MagnetSens_Pin;
@@ -523,6 +614,9 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+
+	HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_RESET);
+
   __disable_irq();
   while (1)
   {
