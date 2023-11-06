@@ -2,9 +2,9 @@
 CAD.formats=
 CAD.pinconfig=
 CAD.provider=
-FREERTOS.FootprintOK=false
+FREERTOS.FootprintOK=true
 FREERTOS.IPParameters=Tasks01,configTOTAL_HEAP_SIZE,FootprintOK,configUSE_NEWLIB_REENTRANT
-FREERTOS.Tasks01=Read_Task,0,512,StartRead_Task,Default,NULL,Dynamic,NULL,NULL;UART_Transmit,0,512,StartUART_Transmit,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.Tasks01=Read_Task,0,512,StartRead_Task,Default,NULL,Dynamic,NULL,NULL;UART_Transmit,0,512,StartUART_Transmit,Default,NULL,Dynamic,NULL,NULL;Button_Task,0,512,StartButton_Task,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configTOTAL_HEAP_SIZE=8192
 FREERTOS.configUSE_NEWLIB_REENTRANT=1
 File.Version=6

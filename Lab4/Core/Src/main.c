@@ -52,6 +52,7 @@ UART_HandleTypeDef huart1;
 
 osThreadId Read_TaskHandle;
 osThreadId UART_TransmitHandle;
+osThreadId Button_TaskHandle;
 /* USER CODE BEGIN PV */
 uint8_t txbuffer[64];
 
@@ -70,6 +71,7 @@ static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartRead_Task(void const * argument);
 void StartUART_Transmit(void const * argument);
+void StartButton_Task(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -77,12 +79,13 @@ void StartUART_Transmit(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t pin){
-	if(pin == BUTT_Pin){
-		sensorNum++;
-		if(sensorNum == 4) sensorNum = 0;
-	}
-}
+/* Interrupt for button press */
+//void HAL_GPIO_EXTI_Callback(uint16_t pin){
+//	if(pin == BUTT_Pin){
+//		sensorNum++;
+//		if(sensorNum == 4) sensorNum = 0;
+//	}
+//}
 /* USER CODE END 0 */
 
 /**
@@ -157,6 +160,10 @@ int main(void)
   /* definition and creation of UART_Transmit */
   osThreadDef(UART_Transmit, StartUART_Transmit, osPriorityNormal, 0, 512);
   UART_TransmitHandle = osThreadCreate(osThread(UART_Transmit), NULL);
+
+  /* definition and creation of Button_Task */
+  osThreadDef(Button_Task, StartButton_Task, osPriorityNormal, 0, 512);
+  Button_TaskHandle = osThreadCreate(osThread(Button_Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -462,6 +469,29 @@ void StartUART_Transmit(void const * argument)
     }
   }
   /* USER CODE END StartUART_Transmit */
+}
+
+/* USER CODE BEGIN Header_StartButton_Task */
+/**
+* @brief Function implementing the Button_Task thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartButton_Task */
+void StartButton_Task(void const * argument)
+{
+  /* USER CODE BEGIN StartButton_Task */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(100);
+    if(HAL_GPIO_ReadPin(GPIOC, BUTT_Pin) == 0){
+    	sensorNum++;
+    	if(sensorNum == 4) sensorNum = 0;
+    }
+    HAL_Delay(150);
+  }
+  /* USER CODE END StartButton_Task */
 }
 
 /**
