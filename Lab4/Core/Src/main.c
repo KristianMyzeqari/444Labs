@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "string.h"
 #include "stm32l4s5i_iot01_tsensor.h"
 #include "stm32l4s5i_iot01_magneto.h"
 #include "stm32l4s5i_iot01_psensor.h"
@@ -49,10 +50,17 @@ I2C_HandleTypeDef hi2c2;
 
 UART_HandleTypeDef huart1;
 
-osThreadId defaultTaskHandle;
+osThreadId Read_TaskHandle;
+osThreadId UART_TransmitHandle;
 /* USER CODE BEGIN PV */
 uint8_t txbuffer[64];
-uint8_t rxbuffer[27];
+
+int sensorNum = 0;
+
+float temp;
+int16_t magnet[3];
+float pressure;
+int16_t accel[3];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,7 +68,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
-void StartDefaultTask(void const * argument);
+void StartRead_Task(void const * argument);
+void StartUART_Transmit(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -141,9 +150,13 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* definition and creation of Read_Task */
+  osThreadDef(Read_Task, StartRead_Task, osPriorityNormal, 0, 512);
+  Read_TaskHandle = osThreadCreate(osThread(Read_Task), NULL);
+
+  /* definition and creation of UART_Transmit */
+  osThreadDef(UART_Transmit, StartUART_Transmit, osPriorityNormal, 0, 512);
+  UART_TransmitHandle = osThreadCreate(osThread(UART_Transmit), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -155,40 +168,37 @@ int main(void)
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  float temp;
-  int16_t magnet[3];
-  float pressure;
-  int16_t accel[3];
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  // If 0, Temperature sensor is active
-	  if(sensorNum == 0){
-		  temp = BSP_TSENSOR_ReadTemp();
-		  sprintf((char*)txbuffer, "Temperature: %f\r\n", temp);
-		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
-	  }
-	  // If 1, Magnetometer is active
-	  if(sensorNum == 1){
-		  BSP_MAGNETO_GetXYZ(magnet);
-		  sprintf((char*)txbuffer, "Magnetometer: %d, %d, %d\r\n", magnet[0], magnet[1], magnet[2]);
-		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
-	  }
-	  // If 2, Pressure sensor is active
-	  if(sensorNum == 2){
-		  pressure = BSP_PSENSOR_ReadPressure();
-		  sprintf((char*)txbuffer, "Pressure: %f\r\n", pressure);
-		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
-	  }
-	  // If 3, Accelerometer is active
-	  if(sensorNum == 3){
-		  BSP_ACCELERO_AccGetXYZ(accel);
-		  sprintf((char*)txbuffer, "Accelerometer: %d, %d, %d\r\n", accel[0], accel[1], accel[2]);
-		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
-	  }
-	  HAL_Delay(100);
+//	  // If 0, Temperature sensor is active
+//	  if(sensorNum == 0){
+//		  temp = BSP_TSENSOR_ReadTemp();
+//		  sprintf((char*)txbuffer, "Temperature: %f\r\n", temp);
+//		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+//	  }
+//	  // If 1, Magnetometer is active
+//	  if(sensorNum == 1){
+//		  BSP_MAGNETO_GetXYZ(magnet);
+//		  sprintf((char*)txbuffer, "Magnetometer: %d, %d, %d\r\n", magnet[0], magnet[1], magnet[2]);
+//		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+//	  }
+//	  // If 2, Pressure sensor is active
+//	  if(sensorNum == 2){
+//		  pressure = BSP_PSENSOR_ReadPressure();
+//		  sprintf((char*)txbuffer, "Pressure: %f\r\n", pressure);
+//		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+//	  }
+//	  // If 3, Accelerometer is active
+//	  if(sensorNum == 3){
+//		  BSP_ACCELERO_AccGetXYZ(accel);
+//		  sprintf((char*)txbuffer, "Accelerometer: %d, %d, %d\r\n", accel[0], accel[1], accel[2]);
+//		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+//	  }
+//	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
@@ -354,6 +364,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pins : BUTT_Pin MagnetSens_Pin */
   GPIO_InitStruct.Pin = BUTT_Pin|MagnetSens_Pin;
@@ -379,22 +390,78 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_StartRead_Task */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the Read_Task thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+/* USER CODE END Header_StartRead_Task */
+void StartRead_Task(void const * argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(100);
+
+    // If 0, Temperature sensor is active
+    if(sensorNum == 0){
+    	temp = BSP_TSENSOR_ReadTemp();
+    	sprintf((char*)txbuffer, "Temperature: %f\r\n", temp);
+    }
+    // If 1, Magnetometer is active
+    if(sensorNum == 1){
+    	BSP_MAGNETO_GetXYZ(magnet);
+    	sprintf((char*)txbuffer, "Magnetometer: %d, %d, %d\r\n", magnet[0], magnet[1], magnet[2]);
+    }
+    // If 2, Pressure sensor is active
+    if(sensorNum == 2){
+    	pressure = BSP_PSENSOR_ReadPressure();
+    	sprintf((char*)txbuffer, "Pressure: %f\r\n", pressure);
+    }
+    // If 3, Accelerometer is active
+    if(sensorNum == 3){
+    	BSP_ACCELERO_AccGetXYZ(accel);
+    	sprintf((char*)txbuffer, "Accelerometer: %d, %d, %d\r\n", accel[0], accel[1], accel[2]);
+    }
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartUART_Transmit */
+/**
+* @brief Function implementing the UART_Transmit thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUART_Transmit */
+void StartUART_Transmit(void const * argument)
+{
+  /* USER CODE BEGIN StartUART_Transmit */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(100);
+
+    // If 0, Temperature sensor is active
+    if(sensorNum == 0){
+    	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    }
+    // If 1, Magnetometer is active
+    if(sensorNum == 1){
+       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    }
+    // If 2, Pressure sensor is active
+    if(sensorNum == 2){
+       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    }
+    // If 3, Accelerometer is active
+    if(sensorNum == 3){
+       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    }
+  }
+  /* USER CODE END StartUART_Transmit */
 }
 
 /**
