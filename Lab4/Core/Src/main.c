@@ -80,11 +80,13 @@ uint8_t *writeBuf = "6";
 
 uint8_t tempBuf[11];
 uint8_t tempBuf2[50];
-uint8_t tempBuf3[200];
+uint8_t tempBuf3[250];
 long tempWriteCnt = 0;
 long tempReadCnt = 0;
 int tempVals = 0;
 float tempAvg = 0;
+float tempSum = 0;
+float tempVariance = 0;
 uint8_t readBufTemp[11];
 
 
@@ -92,7 +94,7 @@ uint8_t magnetBufX[5];
 uint8_t magnetBufY[5];
 uint8_t magnetBufZ[5];
 uint8_t magnetBuf2[60];
-uint8_t magnetBuf3[200];
+uint8_t magnetBuf3[350];
 long magnetWriteCntX = 4096;
 long magnetWriteCntY = 5461;
 long magnetWriteCntZ = 6826;
@@ -103,15 +105,51 @@ int magnetVals = 0;
 float magnetAvgX = 0;
 float magnetAvgY = 0;
 float magnetAvgZ = 0;
+float magnetSumX = 0;
+float magnetSumY = 0;
+float magnetSumZ = 0;
+float magnetVarianceX = 0;
+float magnetVarianceY = 0;
+float magnetVarianceZ = 0;
 uint8_t readBufMagnetX[5];
 uint8_t readBufMagnetY[5];
 uint8_t readBufMagnetZ[5];
 
-uint8_t presBuf[1200];
-uint8_t presCnt = 0;
+uint8_t presBuf[11];
+uint8_t presBuf2[50];
+uint8_t presBuf3[200];
+long presWriteCnt = 8192;
+long presReadCnt = 8192;
+int presVals = 0;
+float presAvg = 0;
+float presSum = 0;
+float presVariance = 0;
+uint8_t readBufPres[11];
 
-uint8_t accelBuf[1600];
-uint8_t accelCnt = 0;
+uint8_t accelBufX[5];
+uint8_t accelBufY[5];
+uint8_t accelBufZ[5];
+uint8_t accelBuf2[60];
+uint8_t accelBuf3[250];
+long accelWriteCntX = 12288;
+long accelWriteCntY = 13653;
+long accelWriteCntZ = 15018;
+long accelReadCntX = 12288;
+long accelReadCntY = 13653;
+long accelReadCntZ = 15018;
+int accelVals = 0;
+float accelAvgX = 0;
+float accelAvgY = 0;
+float accelAvgZ = 0;
+float accelSumX = 0;
+float accelSumY = 0;
+float accelSumZ = 0;
+float accelVarianceX = 0;
+float accelVarianceY = 0;
+float accelVarianceZ = 0;
+uint8_t readBufAccelX[5];
+uint8_t readBufAccelY[5];
+uint8_t readBufAccelZ[5];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -550,16 +588,33 @@ void StartRead_Task(void const * argument)
   for(;;)
   {
     osDelay(100);
+    if(sensorNum != 4){
 
-    // If 0, Temperature sensor is active
-    if(sensorNum == 0){
+    	// entering temperature values in flash
     	temp = BSP_TSENSOR_ReadTemp();
 
     	sprintf((char*)tempBuf, "%f", temp);
 
 
     	if(tempWriteCnt >= 4081) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    			Error_Handler();
+    		}
     		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
     	}
 
     	if (BSP_QSPI_Write(tempBuf, tempWriteCnt, 11) != QSPI_OK){
@@ -569,10 +624,9 @@ void StartRead_Task(void const * argument)
     	tempWriteCnt += 11;
 
     	if (tempVals < 371) tempVals++;
-    }
 
-    // If 1, Magnetometer is active
-    if(sensorNum == 1){
+
+    	//Entering magnet values in flash
     	BSP_MAGNETO_GetXYZ(magnet);
 
     	sprintf((char*)magnetBufX, "%d", magnet[0]);
@@ -580,13 +634,66 @@ void StartRead_Task(void const * argument)
     	sprintf((char*)magnetBufZ, "%d", magnet[2]);
 
     	if(magnetWriteCntX >= 5456) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    			Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
     		magnetWriteCntX = 4096;
-    	}
-    	if(magnetWriteCntY >= 6821) {
     		magnetWriteCntY = 5461;
-    	}
-    	if(magnetWriteCntZ >= 8186) {
     		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+
+    	if(magnetWriteCntY >= 6821) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+
+    	if(magnetWriteCntZ >= 8186) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
     	}
 
     	if (BSP_QSPI_Write(magnetBufX, magnetWriteCntX, 5) != QSPI_OK){
@@ -604,19 +711,131 @@ void StartRead_Task(void const * argument)
     	magnetWriteCntZ += 5;
 
     	if(magnetVals < 272) magnetVals++;
-    }
 
-    // If 2, Pressure sensor is active
-    if(sensorNum == 2){
+
+    	// Entering pressure values in flash
+
     	pressure = BSP_PSENSOR_ReadPressure();
-    	sprintf((char*)txbuffer, "Pressure: %f\r\n", pressure);
-    }
 
-    // If 3, Accelerometer is active
-    if(sensorNum == 3){
+    	sprintf((char*)presBuf, "%f", pressure);
+
+
+    	if(presWriteCnt >= 12276) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+
+    	if (BSP_QSPI_Write(presBuf, presWriteCnt, 11) != QSPI_OK){
+    		Error_Handler();
+    	}
+
+    	presWriteCnt += 11;
+
+    	if (presVals < 371) presVals++;
+
+
+    	// Entering accel values in flash
+
     	BSP_ACCELERO_AccGetXYZ(accel);
-    	sprintf((char*)txbuffer, "Accelerometer: %d, %d, %d\r\n", accel[0], accel[1], accel[2]);
-    }
+
+    	sprintf((char*)accelBufX, "%d", accel[0]);
+    	sprintf((char*)accelBufY, "%d", accel[1]);
+    	sprintf((char*)accelBufZ, "%d", accel[2]);
+
+    	if(accelWriteCntX >= 13648) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+    	if(accelWriteCntY >= 15013) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+    	if(accelWriteCntZ >= 16378) {
+    		if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+    		    Error_Handler();
+    		}
+    		tempWriteCnt = 0;
+    		tempVals = 0;
+
+    		magnetWriteCntX = 4096;
+    		magnetWriteCntY = 5461;
+    		magnetWriteCntZ = 6826;
+    		magnetVals = 0;
+
+    		presWriteCnt = 8192;
+    		presVals = 0;
+
+    		accelWriteCntX = 12288;
+    		accelWriteCntY = 13653;
+    		accelWriteCntZ = 15018;
+    		accelVals = 0;
+    	}
+
+    	if (BSP_QSPI_Write(accelBufX, accelWriteCntX, 5) != QSPI_OK){
+    	    Error_Handler();
+    	}
+    	if (BSP_QSPI_Write(accelBufY, accelWriteCntY, 5) != QSPI_OK){
+    	    Error_Handler();
+    	}
+    	if (BSP_QSPI_Write(accelBufZ, accelWriteCntZ, 5) != QSPI_OK){
+    	    Error_Handler();
+    	}
+
+    	accelWriteCntX += 5;
+    	accelWriteCntY += 5;
+    	accelWriteCntZ += 5;
+
+    	if(accelVals < 272) accelVals++;
+  	  }
+
   }
   /* USER CODE END 5 */
 }
@@ -635,16 +854,35 @@ void StartUART_Transmit(void const * argument)
   for(;;)
   {
     osDelay(100);
-    tempAvg = 0;
+
+    tempSum = 0;
+    tempVariance = 0;
     tempReadCnt = 0;
 
-    magnetAvgX = 0;
-    magnetAvgY = 0;
-    magnetAvgZ = 0;
-
+    magnetSumX = 0;
+    magnetSumY = 0;
+    magnetSumZ = 0;
+    magnetVarianceX = 0;
+    magnetVarianceY = 0;
+    magnetVarianceZ = 0;
     magnetReadCntX = 4096;
-    magnetReadCntX = 5461;
-    magnetReadCntX = 6826;
+    magnetReadCntY = 5461;
+    magnetReadCntZ = 6826;
+
+    presSum = 0;
+    presVariance = 0;
+    presReadCnt = 8192;
+
+    accelSumX = 0;
+    accelSumY = 0;
+    accelSumZ = 0;
+    accelVarianceX = 0;
+    accelVarianceY = 0;
+    accelVarianceZ = 0;
+    accelReadCntX = 12288;
+    accelReadCntY = 13653;
+    accelReadCntZ = 15018;
+
     // If 0, Temperature sensor is active
     if(sensorNum == 0){
     	sprintf((char*)tempBuf2, "Temperature: %f\r\n", temp);
@@ -657,28 +895,56 @@ void StartUART_Transmit(void const * argument)
     }
     // If 2, Pressure sensor is active
     if(sensorNum == 2){
-       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    	sprintf((char*)presBuf2, "Pressure: %f\r\n", pressure);
+       	HAL_UART_Transmit(&huart1, presBuf2, sizeof(presBuf2), HAL_MAX_DELAY);
     }
     // If 3, Accelerometer is active
     if(sensorNum == 3){
-       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    	sprintf((char*)accelBuf2, "Accelerometer: %d, %d, %d\r\n", accel[0], accel[1], accel[2]);
+       	HAL_UART_Transmit(&huart1, accelBuf2, sizeof(accelBuf2), HAL_MAX_DELAY);
     }
     // If 4, Information for sensors
     if(sensorNum == 4){
+
+    	/************************************************** TEMPERATURE SENSOR UART OUTPUT COMPUTATIONS *********************************/
 
     	for(int i = 0; i < tempVals; i++){
     		if (BSP_QSPI_Read(readBufTemp, tempReadCnt, 11) != QSPI_OK){
     	    	Error_Handler();
     		}
 
-    	    tempAvg += atof(readBufTemp);
+    	    tempSum += atof(readBufTemp);
     	    tempReadCnt+=11;
     	}
 
-    	tempAvg = tempAvg/tempVals;
+    	if(tempVals == 0){
+    		tempAvg = 0;
+    	}
+    	else{
+    		tempAvg = tempSum/tempVals;
+    	}
 
-    	sprintf((char*)tempBuf3, "Number of Measurements: %d, Average temperature: %f\r\n", tempVals, tempAvg);
+    	tempReadCnt = 0;
+
+    	for(int i = 0; i < tempVals; i++){
+    	    		if (BSP_QSPI_Read(readBufTemp, tempReadCnt, 11) != QSPI_OK){
+    	    	    	Error_Handler();
+    	    		}
+
+    	    	    tempVariance += (atof(readBufTemp) - tempAvg) * (atof(readBufTemp)- tempAvg);
+    	    	    tempReadCnt+=11;
+    	    	}
+    	if(tempVals > 1){
+    		tempVariance = tempVariance/(tempVals - 1);
+    	}
+    	else{
+    		tempVariance = 0;
+    	}
+
+    	sprintf((char*)tempBuf3, "Number of Measurements: %d, Average temperature: %f, Variance: %f\r\n", tempVals, tempAvg, tempVariance);
     	HAL_UART_Transmit(&huart1, tempBuf3, sizeof(tempBuf3), HAL_MAX_DELAY);
+
+    	/************************************************** MAGNETOMETER UART OUTPUT COMPUTATIONS *********************************/
 
     	for(int i = 0; i < magnetVals; i++){
     		if (BSP_QSPI_Read(readBufMagnetX, magnetReadCntX, 5) != QSPI_OK){
@@ -691,21 +957,169 @@ void StartUART_Transmit(void const * argument)
     			Error_Handler();
     		}
 
-    		magnetAvgX += atof(readBufMagnetX);
-    		magnetAvgY += atof(readBufMagnetY);
-    		magnetAvgZ += atof(readBufMagnetZ);
+    		magnetSumX += atof(readBufMagnetX);
+    		magnetSumY += atof(readBufMagnetY);
+    		magnetSumZ += atof(readBufMagnetZ);
 
     		magnetReadCntX += 5;
     		magnetReadCntY += 5;
     		magnetReadCntZ += 5;
     	}
+    	if(magnetVals == 0){
+    		magnetAvgX = 0;
+    		magnetAvgY = 0;
+    		magnetAvgZ = 0;
+    	}
+    	else{
+			magnetAvgX = magnetSumX/magnetVals;
+			magnetAvgY = magnetSumY/magnetVals;
+			magnetAvgZ = magnetSumZ/magnetVals;
+    	}
 
-    	magnetAvgX = magnetAvgX/magnetVals;
-    	magnetAvgY = magnetAvgY/magnetVals;
-    	magnetAvgZ = magnetAvgZ/magnetVals;
+    	magnetReadCntX = 4096;
+    	magnetReadCntY = 5461;
+    	magnetReadCntZ = 6826;
 
-    	sprintf((char*)magnetBuf3, "Number of Measurements: %d, Average magnetometer reading: %f, %f, %f\r\n", magnetVals, magnetAvgX, magnetAvgY, magnetAvgZ);
+    	for(int i = 0; i < magnetVals; i++){
+    		if (BSP_QSPI_Read(readBufMagnetX, magnetReadCntX, 5) != QSPI_OK){
+    	    	Error_Handler();
+    		}
+    		if (BSP_QSPI_Read(readBufMagnetY, magnetReadCntY, 5) != QSPI_OK){
+    	    	Error_Handler();
+    		}
+    		if (BSP_QSPI_Read(readBufMagnetZ, magnetReadCntZ, 5) != QSPI_OK){
+    	    	Error_Handler();
+    		}
+
+    		magnetVarianceX += (atof(readBufMagnetX) - magnetAvgX) * (atof(readBufMagnetX) - magnetAvgX);
+    		magnetVarianceY += (atof(readBufMagnetY) - magnetAvgY) * (atof(readBufMagnetY) - magnetAvgY);
+    		magnetVarianceZ += (atof(readBufMagnetZ) - magnetAvgZ) * (atof(readBufMagnetZ) - magnetAvgZ);
+
+    		magnetReadCntX += 5;
+    		magnetReadCntY += 5;
+    		magnetReadCntZ += 5;
+    	}
+    	if(magnetVals > 1){
+			magnetVarianceX = magnetVarianceX/(magnetVals-1);
+			magnetVarianceY = magnetVarianceY/(magnetVals-1);
+			magnetVarianceZ = magnetVarianceZ/(magnetVals-1);
+    	}
+    	else{
+    		magnetVarianceX = 0;
+    		magnetVarianceY = 0;
+    		magnetVarianceZ = 0;
+    	}
+
+    	sprintf((char*)magnetBuf3, "Number of Measurements: %d, Average magnetometer reading: %f, %f, %f, Variance is: %f, %f, %f\r\n", magnetVals, magnetAvgX, magnetAvgY, magnetAvgZ, magnetVarianceX, magnetVarianceY, magnetVarianceZ);
     	HAL_UART_Transmit(&huart1, magnetBuf3, sizeof(magnetBuf3), HAL_MAX_DELAY);
+
+    	/************************************************** PRESSURE SENSOR UART OUTPUT COMPUTATIONS *********************************/
+
+    	for(int i = 0; i < presVals; i++){
+    	   if (BSP_QSPI_Read(readBufPres, presReadCnt, 11) != QSPI_OK){
+    		   Error_Handler();
+    	   }
+
+    	   presSum += atof(readBufPres);
+    	   presReadCnt+=11;
+    	}
+    	if(presVals == 0){
+    		presAvg = 0;
+    	}
+    	else{
+			presAvg = presSum/presVals;
+    	}
+
+    	presReadCnt = 0;
+    	for(int i = 0; i < presVals; i++){
+    		if (BSP_QSPI_Read(readBufPres, presReadCnt, 11) != QSPI_OK){
+    			Error_Handler();
+    	    }
+
+    		presVariance += (atof(readBufPres) - presAvg) * (atof(readBufPres)- presAvg);
+    	    presReadCnt+=11;
+    	}
+
+    	if(presVals > 1){
+			presVariance = presVariance/(presVals - 1);
+    	}
+    	else{
+    		presVariance = 0;
+    	}
+    	sprintf((char*)presBuf3, "Number of Measurements: %d, Average Pressure: %f, Pressure Variance: %f\r\n", presVals, presAvg, presVariance);
+    	HAL_UART_Transmit(&huart1, presBuf3, sizeof(presBuf3), HAL_MAX_DELAY);
+
+    	/************************************************** ACCELEROMETER UART OUTPUT COMPUTATIONS *********************************/
+
+    	for(int i = 0; i < accelVals; i++){
+    	    if (BSP_QSPI_Read(readBufAccelX, accelReadCntX, 5) != QSPI_OK){
+    	        Error_Handler();
+    	    }
+    	    if (BSP_QSPI_Read(readBufAccelY, accelReadCntY, 5) != QSPI_OK){
+    	        Error_Handler();
+    	    }
+    	    if (BSP_QSPI_Read(readBufAccelZ, accelReadCntZ, 5) != QSPI_OK){
+    	        Error_Handler();
+    	    }
+
+    	    accelSumX += atof(readBufAccelX);
+    	    accelSumY += atof(readBufAccelY);
+    	    accelSumZ += atof(readBufAccelZ);
+
+    	    accelReadCntX += 5;
+    	    accelReadCntY += 5;
+    	    accelReadCntZ += 5;
+    	}
+
+    	if(accelVals == 0){
+    		accelAvgX = 0;
+    		accelAvgY = 0;
+    		accelAvgZ = 0;
+    	}
+    	else{
+			accelAvgX = accelSumX/accelVals;
+			accelAvgY = accelSumY/accelVals;
+			accelAvgZ = accelSumZ/accelVals;
+    	}
+
+    	accelReadCntX = 12288;
+    	accelReadCntY = 13653;
+    	accelReadCntZ = 15018;
+
+    	for(int i = 0; i < accelVals; i++){
+    		if (BSP_QSPI_Read(readBufAccelX, accelReadCntX, 5) != QSPI_OK){
+    			Error_Handler();
+    	    }
+    	    if (BSP_QSPI_Read(readBufAccelY, accelReadCntY, 5) != QSPI_OK){
+    	    	Error_Handler();
+    	    }
+    	    if (BSP_QSPI_Read(readBufAccelZ, accelReadCntZ, 5) != QSPI_OK){
+    	    	Error_Handler();
+    	    }
+
+    	    accelVarianceX += (atof(readBufAccelX) - accelAvgX) * (atof(readBufAccelX) - accelAvgX);
+    	    accelVarianceY += (atof(readBufAccelY) - accelAvgY) * (atof(readBufAccelY) - accelAvgY);
+    	    accelVarianceZ += (atof(readBufAccelZ) - accelAvgZ) * (atof(readBufAccelZ) - accelAvgZ);
+
+
+    	    accelReadCntX += 5;
+    	    accelReadCntY += 5;
+    	    accelReadCntZ += 5;
+    	}
+
+    	if(accelVals > 1){
+			accelVarianceX = accelVarianceX/(accelVals - 1);
+			accelVarianceY = accelVarianceY/(accelVals - 1);
+			accelVarianceZ = accelVarianceZ/(accelVals - 1);
+    	}
+    	else{
+    		accelVarianceX = 0;
+    		accelVarianceY = 0;
+    		accelVarianceZ = 0;
+    	}
+
+    	sprintf((char*)accelBuf3, "Number of Measurements: %d, Average accelerometer reading: %f, %f, %f, Variance is: %f, %f, %f\r\n\n", accelVals, accelAvgX, accelAvgY, accelAvgZ, accelVarianceX, accelVarianceY, accelVarianceZ);
+    	HAL_UART_Transmit(&huart1, accelBuf3, sizeof(accelBuf3), HAL_MAX_DELAY);
     }
   }
   /* USER CODE END StartUART_Transmit */
