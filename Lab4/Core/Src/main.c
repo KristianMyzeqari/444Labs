@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
 #include "string.h"
+#include "stdlib.h"
 #include "stm32l4s5i_iot01_tsensor.h"
 #include "stm32l4s5i_iot01_magneto.h"
 #include "stm32l4s5i_iot01_psensor.h"
@@ -71,8 +72,46 @@ float pressure;
 int16_t accel[3];
 
 /**************************** PART 3 VARIABLES ****************************/
-uint8_t *writeBuf = "Number 69";
-uint8_t readBuf[100];
+uint8_t *writeBuf = "6";
+
+
+/**************************** PART 4 VARIABLES ****************************/
+
+
+uint8_t tempBuf[11];
+uint8_t tempBuf2[50];
+uint8_t tempBuf3[200];
+long tempWriteCnt = 0;
+long tempReadCnt = 0;
+int tempVals = 0;
+float tempAvg = 0;
+uint8_t readBufTemp[11];
+
+
+uint8_t magnetBufX[5];
+uint8_t magnetBufY[5];
+uint8_t magnetBufZ[5];
+uint8_t magnetBuf2[60];
+uint8_t magnetBuf3[200];
+long magnetWriteCntX = 4096;
+long magnetWriteCntY = 5461;
+long magnetWriteCntZ = 6826;
+long magnetReadCntX = 4096;
+long magnetReadCntY = 5461;
+long magnetReadCntZ = 6826;
+int magnetVals = 0;
+float magnetAvgX = 0;
+float magnetAvgY = 0;
+float magnetAvgZ = 0;
+uint8_t readBufMagnetX[5];
+uint8_t readBufMagnetY[5];
+uint8_t readBufMagnetZ[5];
+
+uint8_t presBuf[1200];
+uint8_t presCnt = 0;
+
+uint8_t accelBuf[1600];
+uint8_t accelCnt = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,13 +130,7 @@ void StartButton_Task(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/* Interrupt for button press */
-//void HAL_GPIO_EXTI_Callback(uint16_t pin){
-//	if(pin == BUTT_Pin){
-//		sensorNum++;
-//		if(sensorNum == 4) sensorNum = 0;
-//	}
-//}
+
 /* USER CODE END 0 */
 
 /**
@@ -107,7 +140,7 @@ void StartButton_Task(void const * argument);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_SET);
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -152,6 +185,13 @@ int main(void)
 	  Error_Handler();
   }
 
+  HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_SET);
+
+  //Clear sector for temp values
+  if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+      Error_Handler();
+  }
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -188,7 +228,7 @@ int main(void)
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
-  //osKernelStart();
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
@@ -196,18 +236,18 @@ int main(void)
 
   //HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_RESET);
 
-  if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
-	  Error_Handler();
-  }
-
-  if (BSP_QSPI_Write(writeBuf, 0, strlen(writeBuf))){
-	  Error_Handler();
-  }
-
-  if (BSP_QSPI_Read(readBuf, 0, 100)){
-	  Error_Handler();
-  }
-  HAL_UART_Transmit(&huart1, readBuf, strlen((char*)readBuf), HAL_MAX_DELAY);
+//  if (BSP_QSPI_Erase_Block(0) != QSPI_OK){
+//	  Error_Handler();
+//  }
+//
+//  if (BSP_QSPI_Write(writeBuf, 0, strlen(writeBuf)) != QSPI_OK){
+//	  Error_Handler();
+//  }
+//
+//  if (BSP_QSPI_Read(readBuf, 0, strlen((char*)writeBuf)) != QSPI_OK){
+//	  Error_Handler();
+//  }
+//  HAL_UART_Transmit(&huart1, readBuf, strlen((char*)readBuf), HAL_MAX_DELAY);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -238,6 +278,15 @@ int main(void)
 //		  HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
 //	  }
 //	  HAL_Delay(100);
+
+	  /************* PART 4 TESTING **********************/
+//	  if(dataMode == 0){
+//		  temp = BSP_TSENSOR_ReadTemp();
+//		  sprintf((char*)tempBuf, "%f\r\n", temp);
+//		  HAL_UART_Transmit(&huart1, tempBuf, strlen((char*)tempBuf), HAL_MAX_DELAY);
+//	  }
+	  //HAL_Delay(100);
+
   }
   /* USER CODE END 3 */
 }
@@ -452,7 +501,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(REDLED_GPIO_Port, REDLED_Pin, GPIO_PIN_RESET);
@@ -506,18 +554,64 @@ void StartRead_Task(void const * argument)
     // If 0, Temperature sensor is active
     if(sensorNum == 0){
     	temp = BSP_TSENSOR_ReadTemp();
-    	sprintf((char*)txbuffer, "Temperature: %f\r\n", temp);
+
+    	sprintf((char*)tempBuf, "%f", temp);
+
+
+    	if(tempWriteCnt >= 4081) {
+    		tempWriteCnt = 0;
+    	}
+
+    	if (BSP_QSPI_Write(tempBuf, tempWriteCnt, 11) != QSPI_OK){
+    		Error_Handler();
+    	}
+
+    	tempWriteCnt += 11;
+
+    	if (tempVals < 371) tempVals++;
     }
+
     // If 1, Magnetometer is active
     if(sensorNum == 1){
     	BSP_MAGNETO_GetXYZ(magnet);
-    	sprintf((char*)txbuffer, "Magnetometer: %d, %d, %d\r\n", magnet[0], magnet[1], magnet[2]);
+
+    	sprintf((char*)magnetBufX, "%d", magnet[0]);
+    	sprintf((char*)magnetBufY, "%d", magnet[1]);
+    	sprintf((char*)magnetBufZ, "%d", magnet[2]);
+
+    	if(magnetWriteCntX >= 5456) {
+    		magnetWriteCntX = 4096;
+    	}
+    	if(magnetWriteCntY >= 6821) {
+    		magnetWriteCntY = 5461;
+    	}
+    	if(magnetWriteCntZ >= 8186) {
+    		magnetWriteCntZ = 6826;
+    	}
+
+    	if (BSP_QSPI_Write(magnetBufX, magnetWriteCntX, 5) != QSPI_OK){
+    		Error_Handler();
+    	}
+    	if (BSP_QSPI_Write(magnetBufY, magnetWriteCntY, 5) != QSPI_OK){
+    		Error_Handler();
+    	}
+    	if (BSP_QSPI_Write(magnetBufZ, magnetWriteCntZ, 5) != QSPI_OK){
+    		Error_Handler();
+    	}
+
+    	magnetWriteCntX += 5;
+    	magnetWriteCntY += 5;
+    	magnetWriteCntZ += 5;
+
+    	if(magnetVals < 272) magnetVals++;
     }
+
     // If 2, Pressure sensor is active
     if(sensorNum == 2){
     	pressure = BSP_PSENSOR_ReadPressure();
     	sprintf((char*)txbuffer, "Pressure: %f\r\n", pressure);
     }
+
     // If 3, Accelerometer is active
     if(sensorNum == 3){
     	BSP_ACCELERO_AccGetXYZ(accel);
@@ -541,14 +635,25 @@ void StartUART_Transmit(void const * argument)
   for(;;)
   {
     osDelay(100);
+    tempAvg = 0;
+    tempReadCnt = 0;
 
+    magnetAvgX = 0;
+    magnetAvgY = 0;
+    magnetAvgZ = 0;
+
+    magnetReadCntX = 4096;
+    magnetReadCntX = 5461;
+    magnetReadCntX = 6826;
     // If 0, Temperature sensor is active
     if(sensorNum == 0){
-    	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    	sprintf((char*)tempBuf2, "Temperature: %f\r\n", temp);
+    	HAL_UART_Transmit(&huart1, tempBuf2, sizeof(tempBuf2), HAL_MAX_DELAY);
     }
     // If 1, Magnetometer is active
     if(sensorNum == 1){
-       	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    	sprintf((char*)magnetBuf2, "Magnetometer: %d, %d, %d\r\n", magnet[0], magnet[1], magnet[2]);
+    	HAL_UART_Transmit(&huart1, magnetBuf2, sizeof(magnetBuf2), HAL_MAX_DELAY);
     }
     // If 2, Pressure sensor is active
     if(sensorNum == 2){
@@ -557,6 +662,50 @@ void StartUART_Transmit(void const * argument)
     // If 3, Accelerometer is active
     if(sensorNum == 3){
        	HAL_UART_Transmit(&huart1, txbuffer, strlen((char*)txbuffer), HAL_MAX_DELAY);
+    }
+    // If 4, Information for sensors
+    if(sensorNum == 4){
+
+    	for(int i = 0; i < tempVals; i++){
+    		if (BSP_QSPI_Read(readBufTemp, tempReadCnt, 11) != QSPI_OK){
+    	    	Error_Handler();
+    		}
+
+    	    tempAvg += atof(readBufTemp);
+    	    tempReadCnt+=11;
+    	}
+
+    	tempAvg = tempAvg/tempVals;
+
+    	sprintf((char*)tempBuf3, "Number of Measurements: %d, Average temperature: %f\r\n", tempVals, tempAvg);
+    	HAL_UART_Transmit(&huart1, tempBuf3, sizeof(tempBuf3), HAL_MAX_DELAY);
+
+    	for(int i = 0; i < magnetVals; i++){
+    		if (BSP_QSPI_Read(readBufMagnetX, magnetReadCntX, 5) != QSPI_OK){
+    			Error_Handler();
+    		}
+    		if (BSP_QSPI_Read(readBufMagnetY, magnetReadCntY, 5) != QSPI_OK){
+    			Error_Handler();
+    		}
+    		if (BSP_QSPI_Read(readBufMagnetZ, magnetReadCntZ, 5) != QSPI_OK){
+    			Error_Handler();
+    		}
+
+    		magnetAvgX += atof(readBufMagnetX);
+    		magnetAvgY += atof(readBufMagnetY);
+    		magnetAvgZ += atof(readBufMagnetZ);
+
+    		magnetReadCntX += 5;
+    		magnetReadCntY += 5;
+    		magnetReadCntZ += 5;
+    	}
+
+    	magnetAvgX = magnetAvgX/magnetVals;
+    	magnetAvgY = magnetAvgY/magnetVals;
+    	magnetAvgZ = magnetAvgZ/magnetVals;
+
+    	sprintf((char*)magnetBuf3, "Number of Measurements: %d, Average magnetometer reading: %f, %f, %f\r\n", magnetVals, magnetAvgX, magnetAvgY, magnetAvgZ);
+    	HAL_UART_Transmit(&huart1, magnetBuf3, sizeof(magnetBuf3), HAL_MAX_DELAY);
     }
   }
   /* USER CODE END StartUART_Transmit */
@@ -578,7 +727,7 @@ void StartButton_Task(void const * argument)
     osDelay(100);
     if(HAL_GPIO_ReadPin(GPIOC, BUTT_Pin) == 0){
     	sensorNum++;
-    	if(sensorNum == 4) sensorNum = 0;
+    	if(sensorNum == 5) sensorNum = 0;
     }
     HAL_Delay(150);
   }
